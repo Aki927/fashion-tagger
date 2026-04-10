@@ -32,7 +32,7 @@ Click any hashtag pill to copy it, or use **Copy all tags** to copy the full set
 ### Install
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/Aki927/fashion-tagger.git
 cd fashion-tagger
 npm install
 ```
