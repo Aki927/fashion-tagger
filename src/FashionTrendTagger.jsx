@@ -115,6 +115,22 @@ export default function FashionTrendTagger() {
     });
   };
 
+  // Extracts the outermost JSON object from a string by tracking brace depth,
+  // avoiding the greedy-regex trap where {[\s\S]*} consumes too much content.
+  const extractJSON = (text) => {
+    const start = text.indexOf("{");
+    if (start === -1) return null;
+    let depth = 0;
+    for (let i = start; i < text.length; i++) {
+      if (text[i] === "{") depth++;
+      else if (text[i] === "}") {
+        depth--;
+        if (depth === 0) return text.slice(start, i + 1);
+      }
+    }
+    return null;
+  };
+
   const fetchTrends = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -122,36 +138,17 @@ export default function FashionTrendTagger() {
     setTrendNames([]);
     setSummary("");
 
-    const prompt = `You are a fashion trend analyst with access to current runway reports, street style coverage, and social media data.
-
-Search the web for the LATEST fashion trends for: ${category === "All" ? "all fashion categories" : category} | Season: ${season} | Region: ${region}
-
-Then return ONLY a JSON object (no markdown, no explanation) with this exact structure:
-{
-  "summary": "2-3 sentence overview of the dominant aesthetic direction",
-  "trendNames": [
-    { "name": "Quiet Luxury", "description": "Understated, high-quality basics" },
-    ...up to 8 trend names
-  ],
-  "tags": [
-    { "tag": "quietluxury", "score": 98 },
-    { "tag": "oldmoney", "score": 95 },
-    ...up to 30 tags, sorted by trend score 1-100, no spaces, no #, lowercase with camelCase allowed
-  ]
-}
-
-Use REAL, CURRENT trend names and tags sourced from what you find on the web. Prioritize tags that are actually being used on Instagram, TikTok, and fashion editorial. Include a mix of macro trends, micro aesthetics, key item names, and style adjectives.`;
-
     try {
+      const headers = { "Content-Type": "application/json" };
+      const appToken = import.meta.env.VITE_APP_SECRET;
+      if (appToken) headers["X-App-Token"] = appToken;
+
       const res = await fetch("/api/claude", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1000,
-          tools: [{ type: "web_search_20250305", name: "web_search" }],
-          messages: [{ role: "user", content: prompt }],
-        }),
+        headers,
+        // Only send validated params — the server constructs the prompt and
+        // controls the model, max_tokens, and tools.
+        body: JSON.stringify({ category, season, region }),
       });
 
       const data = await res.json();
@@ -164,11 +161,10 @@ Use REAL, CURRENT trend names and tags sourced from what you find on the web. Pr
       const textBlocks = (data.content || []).filter(b => b.type === "text");
       const rawText = textBlocks.map(b => b.text).join("");
 
-      // Extract JSON from the response
-      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error("No JSON found in response");
+      const jsonStr = extractJSON(rawText);
+      if (!jsonStr) throw new Error("No JSON found in response");
 
-      const parsed = JSON.parse(jsonMatch[0]);
+      const parsed = JSON.parse(jsonStr);
       setSummary(parsed.summary || "");
       setTrendNames(parsed.trendNames || []);
       setTags(parsed.tags || []);
