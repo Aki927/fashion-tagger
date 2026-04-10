@@ -60,10 +60,10 @@ VITE_APP_SECRET=
 Run the Vite dev server and the API server in separate terminals:
 
 ```bash
-# Terminal 1 — frontend (http://localhost:5173)
+# Terminal 1 
 npm run dev
 
-# Terminal 2 — API server (http://localhost:3030)
+# Terminal 2 
 npm run server
 ```
 
